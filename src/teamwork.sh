@@ -92,9 +92,9 @@ teamwork::add_comment() {
   fi
 
   response=$(curl -X "POST" "$TEAMWORK_URI/tasks/$TEAMWORK_TASK_ID/comments.json" \
-       -u "$TEAMWORK_API_TOKEN"':' \
-       -H 'Content-Type: application/json; charset=utf-8' \
-       -d "{ \"comment\": { \"body\": \"${body//\"/}\", \"notify\": true, \"content-type\": \"text\", \"isprivate\": false } }" )
+        -u "$TEAMWORK_API_TOKEN"':' \
+        -H 'Content-Type: application/json; charset=utf-8' \
+        -d "{ \"comment\": { \"body\": \"${body//\"/}\", \"notify\": false, \"content-type\": \"text\", \"isprivate\": true } }" )
 
   log::message "$response"
 }
@@ -109,9 +109,9 @@ teamwork::add_tag() {
 
   if [ "$AUTOMATIC_TAGGING" == true ]; then
     response=$(curl -X "PUT" "$TEAMWORK_URI/tasks/$TEAMWORK_TASK_ID/tags.json" \
-       -u "$TEAMWORK_API_TOKEN"':' \
-       -H 'Content-Type: application/json; charset=utf-8' \
-       -d "{ \"tags\": { \"content\": \"${tag_name//\"/}\" } }" )
+        -u "$TEAMWORK_API_TOKEN"':' \
+        -H 'Content-Type: application/json; charset=utf-8' \
+        -d "{ \"tags\": { \"content\": \"${tag_name//\"/}\" } }" )
 
     log::message "$response"
   fi
@@ -127,9 +127,9 @@ teamwork::remove_tag() {
 
   if [ "$AUTOMATIC_TAGGING" == true ]; then
     response=$(curl -X "PUT" "$TEAMWORK_URI/tasks/$TEAMWORK_TASK_ID/tags.json" \
-         -u "$TEAMWORK_API_TOKEN"':' \
-         -H 'Content-Type: application/json; charset=utf-8' \
-         -d "{ \"tags\": { \"content\": \"${tag_name//\"/}\" },\"removeProvidedTags\":\"true\" }" )
+          -u "$TEAMWORK_API_TOKEN"':' \
+          -H 'Content-Type: application/json; charset=utf-8' \
+          -d "{ \"tags\": { \"content\": \"${tag_name//\"/}\" },\"removeProvidedTags\":\"true\" }" )
 
     log::message "$response"
   fi
@@ -149,14 +149,6 @@ teamwork::pull_request_opened() {
 **$user** opened a PR: **$pr_title**
 [$pr_url]($pr_url)
 \`$base_ref\` ⬅️ \`$head_ref\`
-
----
-
-${pr_body}
-
----
-
-🔢 ${pr_stats_array[0]} commits / 📝 ${pr_stats_array[1]} files updated / ➕ ${pr_stats_array[2]} additions / ➖ ${pr_stats_array[3]} deletions
 
   "
 
