@@ -194,11 +194,6 @@ teamwork::pull_request_review_submitted() {
     teamwork::add_comment "
 **$user** submitted a review to the PR: **$pr_title**
 [$pr_url]($pr_url)
-
----
-
-Review: **$review_state**
-$comment
 "
     teamwork::add_tag "PR Approved"
   fi
