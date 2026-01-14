@@ -88,6 +88,7 @@ teamwork::add_comment() {
 
   if [ "$ENV" == "test" ]; then
     log::message "Test - Simulate request. Task ID: $TEAMWORK_TASK_ID - Comment: ${body//\"/}"
+    teamwork::add_reset_comment
     return
   fi
 
@@ -97,6 +98,39 @@ teamwork::add_comment() {
         -d "{ \"comment\": { \"body\": \"${body//\"/}\", \"notify\": false, \"content-type\": \"text\", \"isprivate\": true } }" )
 
   log::message "$response"
+  
+  # Add a reset comment to prevent subsequent manual comments from inheriting private/notify settings
+  teamwork::add_reset_comment
+}
+
+teamwork::add_reset_comment() {
+  if [ "$ENV" == "test" ]; then
+    log::message "Test - Simulate reset comment. Task ID: $TEAMWORK_TASK_ID"
+    return
+  fi
+
+  # Add a minimal public comment with default notify settings to reset UI state
+  # This prevents subsequent manual comments from inheriting the private/no-notify settings
+  # Using a single space as the body to minimize visibility while being valid
+  response=$(curl -X "POST" "$TEAMWORK_URI/tasks/$TEAMWORK_TASK_ID/comments.json" \
+        -u "$TEAMWORK_API_TOKEN"':' \
+        -H 'Content-Type: application/json; charset=utf-8' \
+        -d '{ "comment": { "body": " ", "notify": "", "content-type": "text", "isprivate": false } }' )
+
+  # Extract the comment ID from the response
+  # Teamwork API v1 may return 'commentId' or 'id' depending on the response structure
+  local comment_id
+  comment_id=$(echo "$response" | jq -r '.commentId // .id // empty')
+  
+  if [ -n "$comment_id" ]; then
+    log::message "Reset comment created with ID: $comment_id, deleting it..."
+    # Delete the reset comment immediately to avoid clutter
+    delete_response=$(curl -X "DELETE" "$TEAMWORK_URI/comments/$comment_id.json" \
+          -u "$TEAMWORK_API_TOKEN"':')
+    log::message "Reset comment deleted: $delete_response"
+  else
+    log::message "Could not extract comment ID from response, reset comment may remain: $response"
+  fi
 }
 
 teamwork::add_tag() {

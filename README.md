@@ -61,6 +61,9 @@ When creating a new PR, write in the description of the PR the URL of the task. 
 
 Please note, the comment will be created in Teamwork under the account you have attached to this action. If the API key of the user you are using does not have permissions to access certain projects, the comment will not be created.
 
+### Comment Privacy
+The automated comments added by this action are set as **private** and do **not notify** users by default. This is to prevent spam notifications for automated system updates. To ensure that subsequent manual comments added by users in Teamwork use the default public/notify settings, this action automatically creates and immediately deletes a "reset" comment after each automated comment. This prevents the Teamwork UI from inheriting the private/no-notify settings for future manual comments.
+
 ![GitHub pr comment](./.github/assets/github_pr_comment.png)
 
 ![Teamwork pr comment](./.github/assets/teamwork_pr_comment.png)
