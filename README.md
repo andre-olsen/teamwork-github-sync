@@ -57,12 +57,15 @@ jobs:
 ```
 
 ## Usage
-When creating a new PR, write in the description of the PR the URL of the task. The action will automatically add a comment in the task.
+When creating a new PR, write in the description of the PR the URL of the task. The action will automatically update a custom field called "PR" on the task with the PR URL.
 
-Please note, the comment will be created in Teamwork under the account you have attached to this action. If the API key of the user you are using does not have permissions to access certain projects, the comment will not be created.
+Please note, the action requires a custom field named "PR" to exist on your tasks. The API key you use must have permissions to access and modify the tasks in the target projects.
 
-### Comment Privacy
-The automated comments added by this action are set as **private** and do **not notify** users by default. This is to prevent spam notifications for automated system updates. To ensure that subsequent manual comments added by users in Teamwork use the default public/notify settings, this action automatically creates and immediately deletes a "reset" comment after each automated comment. This prevents the Teamwork UI from inheriting the private/no-notify settings for future manual comments.
+### Custom Field Integration
+Instead of using comments, this action updates a custom field called "PR" on the linked task with the pull request URL. This approach avoids issues with Teamwork's comment UI state that could affect notification settings:
+- When a PR is opened: The "PR" field is set to the PR URL
+- When a PR is merged: The "PR" field is updated to include "(Merged)" status
+- When a PR is closed without merging: The "PR" field is updated to include "(Closed)" status
 
 ![GitHub pr comment](./.github/assets/github_pr_comment.png)
 

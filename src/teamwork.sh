@@ -83,6 +83,53 @@ teamwork::move_task_to_column() {
   log::message "$response"
 }
 
+teamwork::get_custom_field_id() {
+  local -r field_name=$1
+
+  if [ "$ENV" == "test" ]; then
+    echo "123"
+    return
+  fi
+
+  response=$(
+    curl "$TEAMWORK_URI/projects/api/v3/customfields.json?searchTerm=$field_name" -u "$TEAMWORK_API_TOKEN"':' |\
+      jq -r --arg field_name "$field_name" '[.customFields[] | select(.name == $field_name)] | map(.id)[0]'
+  )
+
+  if [ "$response" = "null" ] || [ -z "$response" ]; then
+    log::message "Custom field '$field_name' not found"
+    return
+  fi
+
+  echo "$response"
+}
+
+teamwork::update_task_custom_field() {
+  local -r task_id=$TEAMWORK_TASK_ID
+  local -r field_name=$1
+  local -r field_value=$2
+
+  local -r custom_field_id=$(teamwork::get_custom_field_id "$field_name")
+  
+  if [ -z "$custom_field_id" ]; then
+    log::message "Cannot update custom field - field ID not found for '$field_name'"
+    return
+  fi
+
+  if [ "$ENV" == "test" ]; then
+    log::message "Test - Simulate request. Task ID: $TEAMWORK_TASK_ID - Custom Field: $field_name (ID: $custom_field_id) - Value: $field_value"
+    return
+  fi
+
+  # Use V1 API to update task with custom field
+  response=$(curl -X "PUT" "$TEAMWORK_URI/tasks/$task_id.json" \
+      -u "$TEAMWORK_API_TOKEN"':' \
+      -H 'Content-Type: application/json; charset=utf-8' \
+      -d "{ \"todo-item\": { \"customFields\": [{ \"customFieldId\": $custom_field_id, \"value\": \"$field_value\" }] } }" )
+
+  log::message "$response"
+}
+
 teamwork::add_comment() {
   local -r body=$1
 
@@ -171,45 +218,28 @@ teamwork::remove_tag() {
 
 teamwork::pull_request_opened() {
   local -r pr_url=$(github::get_pr_url)
-  local -r pr_title=$(github::get_pr_title)
-  local -r head_ref=$(github::get_head_ref)
-  local -r base_ref=$(github::get_base_ref)
-  local -r user=$(github::get_sender_user)
-  local -r pr_stats=$(github::get_pr_patch_stats)
-  local -r pr_body=$(github::get_pr_body)
-  IFS=" " read -r -a pr_stats_array <<< "$pr_stats"
 
-  teamwork::add_comment "
-**$user** opened a PR: **$pr_title**
-[$pr_url]($pr_url)
-\`$base_ref\` ⬅️ \`$head_ref\`
-
-  "
+  # Update the PR custom field with the PR URL
+  teamwork::update_task_custom_field "PR" "$pr_url"
 
   teamwork::add_tag "PR Open"
   teamwork::move_task_to_column "$BOARD_COLUMN_OPENED"
 }
 
 teamwork::pull_request_closed() {
-  local -r user=$(github::get_sender_user)
   local -r pr_url=$(github::get_pr_url)
-  local -r pr_title=$(github::get_pr_title)
   local -r pr_merged=$(github::get_pr_merged)
 
   if [ "$pr_merged" == "true" ]; then
-    teamwork::add_comment "
-**$user** merged a PR: **$pr_title**
-[$pr_url]($pr_url)
-"
-  teamwork::add_tag "PR Merged"
-  teamwork::remove_tag "PR Open"
-  teamwork::remove_tag "PR Approved"
-  teamwork::move_task_to_column "$BOARD_COLUMN_MERGED"
+    # Update PR custom field to indicate the PR was merged
+    teamwork::update_task_custom_field "PR" "$pr_url (Merged)"
+    teamwork::add_tag "PR Merged"
+    teamwork::remove_tag "PR Open"
+    teamwork::remove_tag "PR Approved"
+    teamwork::move_task_to_column "$BOARD_COLUMN_MERGED"
   else
-    teamwork::add_comment "
-**$user** closed a PR without merging: **$pr_title**
-[$pr_url]($pr_url)
-"
+    # Update PR custom field to indicate the PR was closed without merging
+    teamwork::update_task_custom_field "PR" "$pr_url (Closed)"
     teamwork::remove_tag "PR Open"
     teamwork::remove_tag "PR Approved"
     teamwork::move_task_to_column "$BOARD_COLUMN_CLOSED"
@@ -217,23 +247,15 @@ teamwork::pull_request_closed() {
 }
 
 teamwork::pull_request_review_submitted() {
-  local -r user=$(github::get_sender_user)
-  local -r pr_url=$(github::get_pr_url)
-  local -r pr_title=$(github::get_pr_title)
   local -r review_state=$(github::get_review_state)
-  local -r comment=$(github::get_review_comment)
 
-  # Only add a message if the PR has been approved
+  # Only add a tag if the PR has been approved
   if [ "$review_state" == "approved" ]; then
-    teamwork::add_comment "
-**$user** submitted a review to the PR: **$pr_title**
-[$pr_url]($pr_url)
-"
     teamwork::add_tag "PR Approved"
   fi
 }
 
 teamwork::pull_request_review_dismissed() {
-  local -r user=$(github::get_sender_user)
-  teamwork::add_comment "Review dismissed by $user"
+  # No action needed for dismissed reviews as the custom field already tracks the PR
+  log::message "Review dismissed - no action taken"
 }
