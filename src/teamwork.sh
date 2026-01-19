@@ -91,8 +91,11 @@ teamwork::get_custom_field_id() {
     return
   fi
 
+  # URL encode the field name for the query parameter
+  local -r encoded_field_name=$(printf %s "$field_name" | jq -sRr @uri)
+
   response=$(
-    curl "$TEAMWORK_URI/projects/api/v3/customfields.json?searchTerm=$field_name" -u "$TEAMWORK_API_TOKEN"':' |\
+    curl "$TEAMWORK_URI/projects/api/v3/customfields.json?searchTerm=$encoded_field_name" -u "$TEAMWORK_API_TOKEN"':' |\
       jq -r --arg field_name "$field_name" '[.customFields[] | select(.name == $field_name)] | map(.id)[0]'
   )
 
@@ -110,7 +113,7 @@ teamwork::update_task_custom_field() {
   local -r field_value=$2
 
   local -r custom_field_id=$(teamwork::get_custom_field_id "$field_name")
-  
+
   if [ -z "$custom_field_id" ]; then
     log::message "Cannot update custom field - field ID not found for '$field_name'"
     return
@@ -122,10 +125,16 @@ teamwork::update_task_custom_field() {
   fi
 
   # Use V1 API to update task with custom field
+  # Properly escape the field_value for JSON using jq
+  local -r json_payload=$(jq -n \
+    --arg field_value "$field_value" \
+    --argjson custom_field_id "$custom_field_id" \
+    '{"todo-item": {"customFields": [{"customFieldId": $custom_field_id, "value": $field_value}]}}')
+
   response=$(curl -X "PUT" "$TEAMWORK_URI/tasks/$task_id.json" \
       -u "$TEAMWORK_API_TOKEN"':' \
       -H 'Content-Type: application/json; charset=utf-8' \
-      -d "{ \"todo-item\": { \"customFields\": [{ \"customFieldId\": $custom_field_id, \"value\": \"$field_value\" }] } }" )
+      -d "$json_payload" )
 
   log::message "$response"
 }
